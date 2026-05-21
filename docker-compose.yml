@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: medibook_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: medibook_user
+      POSTGRES_PASSWORD: medibook_password
+      POSTGRES_DB: medibook_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - medibook_postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: medibook_backend
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      PORT: 5000
+      JWT_SECRET: medibook_super_secret_key
+      DATABASE_URL: postgresql://medibook_user:medibook_password@postgres:5432/medibook_db?schema=public
+    ports:
+      - "5000:5000"
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: medibook_frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      SERVER_API_URL: http://backend:5000
+      NEXT_PUBLIC_API_URL: http://localhost:5000
+    ports:
+      - "3000:3000"
+
+volumes:
+  medibook_postgres_data:

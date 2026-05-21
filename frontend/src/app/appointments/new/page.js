@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function NewAppointmentPage() {
+function NewAppointmentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const doctorId = searchParams.get("doctorId");
@@ -20,11 +20,14 @@ export default function NewAppointmentPage() {
     async function loadDoctor() {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
         const response = await fetch(`${apiUrl}/api/doctors`, {
           cache: "no-store"
         });
+
         const data = await response.json();
         const selectedDoctor = data.doctors.find((item) => item.id === doctorId);
+
         setDoctor(selectedDoctor);
       } catch (err) {
         setError("Impossible de charger le médecin");
@@ -139,5 +142,21 @@ export default function NewAppointmentPage() {
         </form>
       </section>
     </main>
+  );
+}
+
+export default function NewAppointmentPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="authPage">
+          <section className="authCard">
+            <p>Chargement...</p>
+          </section>
+        </main>
+      }
+    >
+      <NewAppointmentContent />
+    </Suspense>
   );
 }

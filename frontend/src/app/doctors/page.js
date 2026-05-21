@@ -1,5 +1,8 @@
 async function getDoctors() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const apiUrl =
+    process.env.SERVER_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:5000";
 
   const response = await fetch(`${apiUrl}/api/doctors`, {
     cache: "no-store"
@@ -28,25 +31,31 @@ export default async function DoctorsPage() {
       </section>
 
       <section className="doctorGrid">
-        {doctors.map((doctor) => (
-          <article key={doctor.id} className="doctorCard">
-            <div>
-              <h2>
-                Dr {doctor.user.firstName} {doctor.user.lastName}
-              </h2>
-              <p className="specialty">{doctor.specialty}</p>
-              <p className="city">{doctor.city}</p>
-              <p className="doctorDescription">{doctor.description}</p>
-            </div>
+        {doctors.length === 0 ? (
+          <p className="emptyMessage">
+            Aucun médecin disponible pour le moment.
+          </p>
+        ) : (
+          doctors.map((doctor) => (
+            <article key={doctor.id} className="doctorCard">
+              <div>
+                <h2>
+                  Dr {doctor.user.firstName} {doctor.user.lastName}
+                </h2>
+                <p className="specialty">{doctor.specialty}</p>
+                <p className="city">{doctor.city}</p>
+                <p className="doctorDescription">{doctor.description}</p>
+              </div>
 
-            <div className="doctorFooter">
-              <span>{doctor.price ? `${doctor.price} €` : "Prix non renseigné"}</span>
-              <a href={`/appointments/new?doctorId=${doctor.id}`} className="primaryButton">
-                Réserver
-              </a>
-            </div>
-          </article>
-        ))}
+              <div className="doctorFooter">
+                <span>{doctor.price ? `${doctor.price} €` : "Prix non renseigné"}</span>
+                <a href={`/appointments/new?doctorId=${doctor.id}`} className="primaryButton">
+                  Réserver
+                </a>
+              </div>
+            </article>
+          ))
+        )}
       </section>
     </main>
   );
