@@ -82,6 +82,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run frontend E2E tests
+        run: npm run e2e
+
       - name: Build frontend
         run: npm run build
 
