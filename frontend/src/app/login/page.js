@@ -40,6 +40,16 @@ export default function LoginPage() {
       localStorage.setItem("medibook_token", data.token);
       localStorage.setItem("medibook_user", JSON.stringify(data.user));
 
+      if (data.user.role === "DOCTOR") {
+        router.push("/doctor/dashboard");
+        return;
+      }
+
+      if (data.user.role === "ADMIN") {
+        router.push("/admin/dashboard");
+        return;
+      }
+
       router.push("/dashboard");
     } catch (err) {
       setError("Impossible de contacter le serveur");
