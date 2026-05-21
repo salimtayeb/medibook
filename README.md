@@ -763,7 +763,7 @@ Liens prévus :
 
 | Élément | Plateforme | Lien |
 |---|---|---|
-| Frontend | Vercel | À compléter |
+| Frontend | Vercel | https://medibook-frontend-red.vercel.app |
 | Backend | Render | https://medibook-backend-g0f1.onrender.com |
 | Repository | GitHub | https://github.com/salimtayeb/medibook |
 
