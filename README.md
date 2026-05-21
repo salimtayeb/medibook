@@ -213,6 +213,7 @@ L’administrateur peut :
 
 - Jest
 - Supertest
+- Playwright
 
 ### DevOps
 
@@ -618,6 +619,8 @@ docker compose down
 
 Les tests backend sont réalisés avec Jest et Supertest.
 
+Les tests E2E frontend sont réalisés avec Playwright.
+
 Ils couvrent :
 
 - routes publiques ;
@@ -636,14 +639,14 @@ Ils couvrent :
 - erreurs serveur ;
 - cas limites.
 
-Lancer les tests :
+Lancer les tests backend :
 
 ```bash
 cd backend
 npm test
 ```
 
-Lancer les tests avec couverture :
+Lancer les tests backend avec couverture :
 
 ```bash
 npm test -- --coverage
@@ -657,7 +660,14 @@ Test Suites      | 3 passed
 Tests            | 43 passed
 ```
 
-Couverture :
+Lancer les tests E2E frontend :
+
+```bash
+cd frontend
+npm run e2e
+```
+
+Couverture backend :
 
 | Type | Couverture |
 |---|---|
