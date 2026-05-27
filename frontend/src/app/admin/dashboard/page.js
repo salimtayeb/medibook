@@ -1,162 +1,240 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { api } from "@/lib/api";
 
-export default function AdminDashboardPage() {
+const STATUS_LABELS = {
+  PENDING: "En attente",
+  CONFIRMED: "Confirmé",
+  COMPLETED: "Terminé",
+  CANCELLED: "Annulé",
+};
+
+const FILTERS = [
+  { key: "ALL", label: "Tous" },
+  { key: "PENDING", label: "En attente" },
+  { key: "CONFIRMED", label: "Confirmé" },
+  { key: "COMPLETED", label: "Terminé" },
+  { key: "CANCELLED", label: "Annulé" },
+];
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString("fr-FR", {
+    day: "numeric", month: "long", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+export default function AdminDashboard() {
+  const { user, token, logout } = useAuth();
+  const addToast = useToast();
   const router = useRouter();
-
-  const [user, setUser] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  async function loadDashboard() {
-    try {
-      const token = localStorage.getItem("medibook_token");
-
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
-      const userResponse = await fetch(`${apiUrl}/api/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      const userData = await userResponse.json();
-
-      if (!userResponse.ok) {
-        localStorage.removeItem("medibook_token");
-        localStorage.removeItem("medibook_user");
-        router.push("/login");
-        return;
-      }
-
-      if (userData.user.role !== "ADMIN") {
-        router.push("/dashboard");
-        return;
-      }
-
-      const appointmentsResponse = await fetch(`${apiUrl}/api/appointments/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      const appointmentsData = await appointmentsResponse.json();
-
-      const doctorsResponse = await fetch(`${apiUrl}/api/doctors`);
-      const doctorsData = await doctorsResponse.json();
-
-      setUser(userData.user);
-      setAppointments(appointmentsData.appointments || []);
-      setDoctors(doctorsData.doctors || []);
-    } catch (err) {
-      setError("Impossible de charger l’espace administrateur");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [filter, setFilter] = useState("ALL");
+  const [tab, setTab] = useState("appointments");
 
   useEffect(() => {
-    loadDashboard();
+    if (!token) { router.push("/login"); return; }
+    if (user && user.role !== "ADMIN") { router.push("/dashboard"); return; }
+    if (!user) return;
+    loadAll();
+  }, [user, token]);
+
+  async function loadAll() {
+    try {
+      const [appRes, docRes] = await Promise.all([
+        api("/api/appointments/me"),
+        api("/api/doctors")
+      ]);
+      const appData = await appRes.json();
+      const docData = await docRes.json();
+      setAppointments(appData.appointments || []);
+      setDoctors(docData.doctors || []);
+    } catch {}
+    finally { setLoading(false); }
+  }
+
+  const handleConfirm = useCallback(async (id) => {
+    try {
+      const res = await api(`/api/appointments/${id}/confirm`, { method: "PATCH" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
+      addToast("Rendez-vous confirmé", "success");
+      loadAll();
+    } catch (e) { addToast(e.message, "error"); }
   }, []);
 
-  function logout() {
-    localStorage.removeItem("medibook_token");
-    localStorage.removeItem("medibook_user");
-    router.push("/login");
-  }
+  const handleComplete = useCallback(async (id) => {
+    try {
+      const res = await api(`/api/appointments/${id}/complete`, { method: "PATCH" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
+      addToast("Rendez-vous terminé", "success");
+      loadAll();
+    } catch (e) { addToast(e.message, "error"); }
+  }, []);
+
+  const handleCancel = useCallback(async (id) => {
+    try {
+      const res = await api(`/api/appointments/${id}/cancel`, { method: "PATCH" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
+      addToast("Rendez-vous annulé", "success");
+      loadAll();
+    } catch (e) { addToast(e.message, "error"); }
+  }, []);
+
+  const counts = {};
+  FILTERS.forEach((f) => { counts[f.key] = f.key === "ALL" ? appointments.length : appointments.filter((a) => a.status === f.key).length; });
+  const filtered = filter === "ALL" ? appointments : appointments.filter((a) => a.status === filter);
 
   if (loading) {
     return (
-      <main className="page">
-        <p>Chargement...</p>
-      </main>
+      <div className="page">
+        <div className="statsGrid">
+          {[1,2,3,4].map(i => <div key={i} className="skeleton skeletonCard" style={{height:100}} />)}
+        </div>
+        <div className="skeleton" style={{height:300}} />
+      </div>
     );
   }
 
+  const pendingCount = counts.PENDING;
+  const completedCount = counts.COMPLETED;
+  const cancelledCount = counts.CANCELLED;
+
   return (
-    <main className="page">
-      <section className="dashboardHeader">
+    <div className="page">
+      <div className="dashboardHeader">
         <div>
-          <a href="/" className="backLink">← Retour à l’accueil</a>
-          <p className="badge">Espace administrateur</p>
-          <h1>Bonjour {user?.firstName}</h1>
-          <p className="description">
-            Supervisez les médecins et les rendez-vous de la plateforme MediBook.
-          </p>
+          <h1 style={{margin:0}}>Administration 🛡️</h1>
+          <p style={{color:"var(--text-secondary)",marginTop:6}}>{user?.firstName} {user?.lastName}</p>
         </div>
-
-        <button onClick={logout} className="logoutButton">
-          Se déconnecter
+        <button className="navbarLogout" onClick={logout}>
+          <span>✕</span> Déconnexion
         </button>
-      </section>
+      </div>
 
-      {error && <p className="errorMessage">{error}</p>}
-
-      <section className="statsGrid">
-        <article className="statCard">
-          <span>Rôle</span>
-          <strong>{user?.role}</strong>
-        </article>
-
-        <article className="statCard">
-          <span>Médecins</span>
-          <strong>{doctors.length}</strong>
-        </article>
-
-        <article className="statCard">
-          <span>Rendez-vous</span>
-          <strong>{appointments.length}</strong>
-        </article>
-      </section>
-
-      <section className="appointmentsSection">
-        <div className="sectionHeader">
-          <h2>Tous les rendez-vous</h2>
+      <div className="statsGrid">
+        <div className="statCard statCard--primary">
+          <div className="statIcon">📅</div>
+          <span className="statLabel">Rendez-vous</span>
+          <strong className="statValue">{appointments.length}</strong>
         </div>
+        <div className="statCard statCard--success">
+          <div className="statIcon">👨‍⚕️</div>
+          <span className="statLabel">Médecins</span>
+          <strong className="statValue">{doctors.length}</strong>
+        </div>
+        <div className="statCard statCard--warning">
+          <div className="statIcon">⏳</div>
+          <span className="statLabel">En attente</span>
+          <strong className="statValue">{pendingCount}</strong>
+        </div>
+        <div className="statCard statCard--danger">
+          <div className="statIcon">✕</div>
+          <span className="statLabel">Annulés</span>
+          <strong className="statValue">{cancelledCount}</strong>
+        </div>
+      </div>
 
-        {appointments.length === 0 ? (
-          <p className="emptyMessage">
-            Aucun rendez-vous enregistré pour le moment.
-          </p>
-        ) : (
-          <div className="appointmentList">
-            {appointments.map((appointment) => (
-              <article key={appointment.id} className="appointmentCard">
-                <div>
-                  <h3>
-                    Patient : {appointment.patient?.firstName} {appointment.patient?.lastName}
-                  </h3>
+      <div className="filterTabs" style={{marginBottom:20}}>
+        <button className={`filterTab${tab === "appointments" ? " filterTab--active" : ""}`} onClick={() => setTab("appointments")}>
+          📋 Rendez-vous ({appointments.length})
+        </button>
+        <button className={`filterTab${tab === "doctors" ? " filterTab--active" : ""}`} onClick={() => setTab("doctors")}>
+          👨‍⚕️ Médecins ({doctors.length})
+        </button>
+      </div>
 
-                  <p className="appointmentMeta">
-                    Médecin : Dr {appointment.doctor?.user?.firstName} {appointment.doctor?.user?.lastName}
-                  </p>
-
-                  <p className="appointmentMeta">
-                    Date : {new Date(appointment.startAt).toLocaleString("fr-FR")}
-                  </p>
-
-                  <p className="appointmentMeta">
-                    Motif : {appointment.reason || "Non renseigné"}
-                  </p>
-                </div>
-
-                <span className="statusBadge">
-                  {appointment.status}
-                </span>
-              </article>
+      {tab === "appointments" && (
+        <div className="appointmentsSection">
+          <div className="sectionHeader">
+            <h2>Tous les rendez-vous</h2>
+          </div>
+          <div className="filterTabs">
+            {FILTERS.map((f) => (
+              <button key={f.key} className={`filterTab${filter === f.key ? " filterTab--active" : ""}`} onClick={() => setFilter(f.key)}>
+                {f.label} <span className="filterCount">{counts[f.key]}</span>
+              </button>
             ))}
           </div>
-        )}
-      </section>
-    </main>
+          {filtered.length === 0 ? (
+            <p className="emptyMessage">Aucun rendez-vous.</p>
+          ) : (
+            <div className="appointmentList">
+              {filtered.map((a) => (
+                <div key={a.id} className="appointmentCard">
+                  <div>
+                    <h3>{a.patient?.firstName} {a.patient?.lastName} → Dr. {a.doctor?.user?.firstName} {a.doctor?.user?.lastName}</h3>
+                    <div className="appointmentMeta">
+                      <span>📅 {formatDate(a.startAt)}</span>
+                      <span>🏥 {a.doctor?.specialty}</span>
+                      {a.reason && <span>💬 {a.reason}</span>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                    <span className={`statusBadge statusBadge--${a.status.toLowerCase()}`}>
+                      {a.status === "PENDING" && "⏳"}
+                      {a.status === "CONFIRMED" && "✅"}
+                      {a.status === "COMPLETED" && "✔️"}
+                      {a.status === "CANCELLED" && "✕"}
+                      {" "}{STATUS_LABELS[a.status]}
+                    </span>
+                    <div className="appointmentActions">
+                      {a.status === "PENDING" && (
+                        <>
+                          <button className="confirmButton" onClick={() => handleConfirm(a.id)}>✅ Confirmer</button>
+                          <button className="cancelButton" onClick={() => handleCancel(a.id)}>Annuler</button>
+                        </>
+                      )}
+                      {a.status === "CONFIRMED" && (
+                        <>
+                          <button className="completeButton" onClick={() => handleComplete(a.id)}>✔️ Terminer</button>
+                          <button className="cancelButton" onClick={() => handleCancel(a.id)}>Annuler</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "doctors" && (
+        <div>
+          <div className="doctorGrid">
+            {doctors.map((d) => (
+              <div key={d.id} className="doctorCard">
+                <div>
+                  <h2>Dr. {d.user?.firstName} {d.user?.lastName}</h2>
+                  <div className="specialty">{d.specialty}</div>
+                  <div className="city">📍 {d.city}</div>
+                  {d.description && <p className="doctorDescription">{d.description}</p>}
+                  <div className="reviewAvg" style={{marginTop:8}}>
+                    <div className="stars stars--readonly">
+                      {[1,2,3,4,5].map(s => (
+                        <span key={s} className={s <= Math.round(d.averageRating || 0) ? "filled" : ""}>
+                          {s <= Math.round(d.averageRating || 0) ? "★" : "☆"}
+                        </span>
+                      ))}
+                    </div>
+                    <strong>{d.averageRating || "—"}</strong>
+                    <span>({d.reviewCount || 0} avis)</span>
+                  </div>
+                </div>
+                <div className="doctorFooter">
+                  {d.price && <span className="price">{d.price} €</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

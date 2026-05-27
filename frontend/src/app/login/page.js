@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("patient@test.com");
   const [password, setPassword] = useState("password123");
@@ -21,13 +23,8 @@ export default function LoginPage() {
 
       const response = await fetch(`${apiUrl}/api/auth/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          email,
-          password
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
       });
 
       const data = await response.json();
@@ -37,19 +34,16 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem("medibook_token", data.token);
-      localStorage.setItem("medibook_user", JSON.stringify(data.user));
+      login(data.token, data.user);
 
       if (data.user.role === "DOCTOR") {
         router.push("/doctor/dashboard");
         return;
       }
-
       if (data.user.role === "ADMIN") {
         router.push("/admin/dashboard");
         return;
       }
-
       router.push("/dashboard");
     } catch (err) {
       setError("Impossible de contacter le serveur");
@@ -61,11 +55,8 @@ export default function LoginPage() {
   return (
     <main className="authPage">
       <section className="authCard">
-        <a href="/" className="backLink">← Retour à l’accueil</a>
-
         <p className="badge">Connexion</p>
         <h1>Se connecter</h1>
-
         <p className="description">
           Connectez-vous à votre espace MediBook pour gérer vos rendez-vous.
         </p>

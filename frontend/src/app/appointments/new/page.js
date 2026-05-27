@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import api from "@/lib/api";
 
 function NewAppointmentContent() {
   const router = useRouter();
@@ -15,26 +16,24 @@ function NewAppointmentContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingDoctor, setLoadingDoctor] = useState(true);
 
   useEffect(() => {
     async function loadDoctor() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
-        const response = await fetch(`${apiUrl}/api/doctors`, {
-          cache: "no-store"
-        });
-
+        const response = await api("/api/doctors");
         const data = await response.json();
         const selectedDoctor = data.doctors.find((item) => item.id === doctorId);
-
         setDoctor(selectedDoctor);
-      } catch (err) {
+      } catch {
         setError("Impossible de charger le médecin");
+      } finally {
+        setLoadingDoctor(false);
       }
     }
 
-    loadDoctor();
+    if (doctorId) loadDoctor();
+    else setLoadingDoctor(false);
   }, [doctorId]);
 
   async function handleSubmit(event) {
@@ -45,23 +44,16 @@ function NewAppointmentContent() {
 
     try {
       const token = localStorage.getItem("medibook_token");
-
       if (!token) {
         router.push("/login");
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
       const startAt = new Date(`${date}T${time}:00`);
       const endAt = new Date(startAt.getTime() + 30 * 60 * 1000);
 
-      const response = await fetch(`${apiUrl}/api/appointments`, {
+      const response = await api("/api/appointments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
         body: JSON.stringify({
           doctorId,
           startAt: startAt.toISOString(),
@@ -78,28 +70,38 @@ function NewAppointmentContent() {
       }
 
       setSuccess("Rendez-vous réservé avec succès");
-
       setTimeout(() => {
         router.push("/dashboard");
       }, 1000);
-    } catch (err) {
+    } catch {
       setError("Impossible de contacter le serveur");
     } finally {
       setLoading(false);
     }
   }
 
+  if (loadingDoctor) {
+    return (
+      <main className="authPage">
+        <section className="authCard">
+          <p className="badge">Réservation</p>
+          <div className="skeleton skeletonText" />
+          <div className="skeleton skeletonTextShort" />
+          <div className="skeleton skeletonCard" style={{ height: "250px", marginTop: "20px" }} />
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="authPage">
       <section className="authCard">
-        <a href="/doctors" className="backLink">← Retour aux médecins</a>
-
         <p className="badge">Réservation</p>
         <h1>Réserver un rendez-vous</h1>
 
         {doctor && (
           <p className="description">
-            Avec Dr {doctor.user.firstName} {doctor.user.lastName} — {doctor.specialty}
+            Avec Dr {doctor.user.firstName} {doctor.user.lastName} &mdash; {doctor.specialty}
           </p>
         )}
 

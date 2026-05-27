@@ -27,9 +27,13 @@ model User {
   firstName String
   lastName  String
   role      Role   @default(PATIENT)
+  phone     String?
 
   doctorProfile DoctorProfile?
   appointments  Appointment[]  @relation("PatientAppointments")
+  documents     Document[]
+  reviews       Review[]
+  favorites     FavoriteDoctor[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -42,12 +46,46 @@ model DoctorProfile {
   city        String
   description String?
   price       Int?
+  address     String?
+  latitude    Float?
+  longitude   Float?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   appointments Appointment[]
+  reviews      Review[]
+  favorites    FavoriteDoctor[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  doctorId  String
+  patientId String
+  rating    Int
+  comment   String?
+
+  doctor  DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient User          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([doctorId, patientId])
+}
+
+model FavoriteDoctor {
+  id        String   @id @default(cuid())
+  patientId String
+  doctorId  String
+
+  patient User          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([patientId, doctorId])
 }
 
 model Appointment {
@@ -61,6 +99,34 @@ model Appointment {
 
   patient User          @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
   doctor  DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  type      String
+  fileUrl   String
+  fileSize  Int?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Pharmacy {
+  id           String   @id @default(cuid())
+  name         String
+  address      String
+  phone        String?
+  city         String
+  latitude     Float?
+  longitude    Float?
+  openingHours String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

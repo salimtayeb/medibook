@@ -10,11 +10,15 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "next": "14.2.15",
     "react": "^18",
     "react-dom": "^18"
   },
   "devDependencies": {
+    "@capacitor/ios": "^8.3.4",
     "@playwright/test": "^1.60.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.15"

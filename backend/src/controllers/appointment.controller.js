@@ -195,6 +195,116 @@ export const getMyAppointments = async (req, res) => {
   }
 };
 
+export const confirmAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (req.user.role !== "DOCTOR" && req.user.role !== "ADMIN") {
+      return res.status(403).json({
+        message: "Seuls les médecins et administrateurs peuvent confirmer un rendez-vous"
+      });
+    }
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id }
+    });
+
+    if (!appointment) {
+      return res.status(404).json({
+        message: "Rendez-vous introuvable"
+      });
+    }
+
+    if (appointment.status !== "PENDING") {
+      return res.status(400).json({
+        message: "Seuls les rendez-vous en attente peuvent être confirmés"
+      });
+    }
+
+    if (req.user.role === "DOCTOR") {
+      const doctorProfile = await prisma.doctorProfile.findUnique({
+        where: { userId: req.user.id }
+      });
+
+      if (doctorProfile?.id !== appointment.doctorId) {
+        return res.status(403).json({
+          message: "Vous ne pouvez pas confirmer un rendez-vous qui ne vous est pas destiné"
+        });
+      }
+    }
+
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id },
+      data: { status: "CONFIRMED" }
+    });
+
+    return res.json({
+      message: "Rendez-vous confirmé avec succès",
+      appointment: updatedAppointment
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Erreur serveur",
+      error: error.message
+    });
+  }
+};
+
+export const completeAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (req.user.role !== "DOCTOR" && req.user.role !== "ADMIN") {
+      return res.status(403).json({
+        message: "Seuls les médecins et administrateurs peuvent compléter un rendez-vous"
+      });
+    }
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id }
+    });
+
+    if (!appointment) {
+      return res.status(404).json({
+        message: "Rendez-vous introuvable"
+      });
+    }
+
+    if (appointment.status !== "CONFIRMED") {
+      return res.status(400).json({
+        message: "Seuls les rendez-vous confirmés peuvent être complétés"
+      });
+    }
+
+    if (req.user.role === "DOCTOR") {
+      const doctorProfile = await prisma.doctorProfile.findUnique({
+        where: { userId: req.user.id }
+      });
+
+      if (doctorProfile?.id !== appointment.doctorId) {
+        return res.status(403).json({
+          message: "Vous ne pouvez pas compléter un rendez-vous qui ne vous est pas destiné"
+        });
+      }
+    }
+
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id },
+      data: { status: "COMPLETED" }
+    });
+
+    return res.json({
+      message: "Rendez-vous complété avec succès",
+      appointment: updatedAppointment
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Erreur serveur",
+      error: error.message
+    });
+  }
+};
+
 export const cancelAppointment = async (req, res) => {
   try {
     const { id } = req.params;

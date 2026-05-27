@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../config/prisma.js";
-import { registerSchema, loginSchema } from "../validators/auth.validator.js";
+import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema } from "../validators/auth.validator.js";
 
 export const register = async (req, res) => {
   try {
@@ -14,7 +14,7 @@ export const register = async (req, res) => {
       });
     }
 
-    const { email, password, firstName, lastName } = validation.data;
+    const { email, password, firstName, lastName, role, phone } = validation.data;
 
     const existingUser = await prisma.user.findUnique({
       where: { email }
@@ -34,7 +34,8 @@ export const register = async (req, res) => {
         password: hashedPassword,
         firstName,
         lastName,
-        role: "PATIENT"
+        role,
+        phone
       },
       select: {
         id: true,
@@ -42,6 +43,7 @@ export const register = async (req, res) => {
         firstName: true,
         lastName: true,
         role: true,
+        phone: true,
         createdAt: true
       }
     });
@@ -109,8 +111,108 @@ export const login = async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role
+        role: user.role,
+        phone: user.phone
       }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Erreur serveur",
+      error: error.message
+    });
+  }
+};
+
+export const getMe = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        phone: true,
+        createdAt: true
+      }
+    });
+
+    return res.json({ user });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Erreur serveur",
+      error: error.message
+    });
+  }
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const validation = updateProfileSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        message: "Données invalides",
+        errors: validation.error.errors
+      });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: validation.data,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        phone: true,
+        createdAt: true
+      }
+    });
+
+    return res.json({
+      message: "Profil mis à jour avec succès",
+      user
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Erreur serveur",
+      error: error.message
+    });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const validation = changePasswordSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        message: "Données invalides",
+        errors: validation.error.errors
+      });
+    }
+
+    const { currentPassword, newPassword } = validation.data;
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(400).json({
+        message: "Mot de passe actuel incorrect"
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { password: hashedPassword }
+    });
+
+    return res.json({
+      message: "Mot de passe modifié avec succès"
     });
   } catch (error) {
     return res.status(500).json({

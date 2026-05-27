@@ -1,4 +1,11 @@
-
 # Playwright
 frontend/test-results/
 frontend/playwright-report/
+
+# Android build output
+generated/
+apk-output/
+
+# Android keystore (sensitive)
+frontend/android/keystore/
+frontend/android/keystore.properties
